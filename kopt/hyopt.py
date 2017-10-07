@@ -566,7 +566,8 @@ class CompileFN():
         # setup paths for storing the data - TODO check if we can somehow get the id from hyperopt
         rid = str(uuid4())
         tm_dir = self.save_dir_exp + "/train_models/"
-        os.makedirs(tm_dir, exist_ok=True)
+        if not os.path.exists(tm_dir):
+            os.makedirs(tm_dir)
         model_path = tm_dir + "{0}.h5".format(rid) if self.save_model else ""
         results_path = tm_dir + "{0}.json".format(rid) if self.save_results else ""
 

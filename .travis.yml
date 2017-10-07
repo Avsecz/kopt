@@ -28,7 +28,7 @@ install:
 
 # test-environment
 - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION numpy pandas pytest
-  bcolz scipy
+  h5py scipy
 - source activate test-environment
 - python --version
 - pip --version
