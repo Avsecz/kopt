@@ -3,13 +3,12 @@
 [![Build Status](https://travis-ci.org/avsecz/keras-hyperop.svg?branch=master)](https://travis-ci.org/avsecz/keras-hyperop)
 [![license](https://img.shields.io/github/license/mashape/apistatus.svg?maxAge=2592000)](https://github.com/avsecz/keras-hyperopt/blob/master/LICENSE)
 
-
 kopt is a hyper-parameter optimization library for Keras models. It is based on [hyperopt](https://github.com/hyperopt/hyperopt).
 
 ## Getting started
 
 Here is an example of hyper-parameter optimization for the Keras IMDB
-example LSTM model.
+example model.
 
 ```python
 from keras.datasets import imdb
@@ -17,9 +16,10 @@ from keras.preprocessing import sequence
 from keras.models import Sequential
 import keras.layers as kl
 from keras.optimizers import Adam
-
-from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
+# kopt and hyoperot imports
 from kopt import CompileFN, KMongoTrials, fn_test
+from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
+
 
 # 1. define the data function returning training, (validation, test) data
 def data(max_features=5000, maxlen=80):
@@ -28,8 +28,8 @@ def data(max_features=5000, maxlen=80):
     x_test = sequence.pad_sequences(x_test, maxlen=maxlen)
     return (x_train[:100], y_train[:100], max_features), (x_test, y_test)
 
-# 2. Define the model function returning a compiled Keras model
 
+# 2. Define the model function returning a compiled Keras model
 def model(train_data, lr=0.001,
           embedding_dims=128, rnn_units=64,
           dropout=0.2):
@@ -47,10 +47,8 @@ def model(train_data, lr=0.001,
     return model
 
 # Specify the optimization metrics
-
 db_name="imdb"
 exp_name="myexp1"
-
 objective = CompileFN(db_name, exp_name,
                       data_fn=data,
                       model_fn=model,
@@ -63,8 +61,6 @@ objective = CompileFN(db_name, exp_name,
 
 # define the hyper-parameter ranges
 # see https://github.com/hyperopt/hyperopt/wiki/FMin for more info
-
-
 hyper_params = {
 	"data": {
 	    "max_features": 100,
@@ -103,7 +99,7 @@ best = fmin(objective, hyper_params, trials=trials, algo=tpe.suggest, max_evals=
 
 - [nbs/imdb_example.ipynb](nbs/imdb_example.ipynb)
 
-The documentation of `concise.hyopt`:
+The documentation of `concise.hyopt` (`kopt` was ported from `concise.hyopt`):
 
 - [Tutorial](https://i12g-gagneurweb.in.tum.de/public/docs/concise/tutorials/hyper-parameter_optimization/)
 - [API documentation](https://i12g-gagneurweb.in.tum.de/public/docs/concise/hyopt/)
