@@ -1,0 +1,42 @@
+language: python
+sudo: required
+dist: trusty
+
+services:
+  - mongodb
+
+matrix:
+  include:
+  - python: 2.7
+  - python: 3.4
+  - python: 3.5
+  - python: 3.6
+
+
+install:
+# setup conda
+# Used from https://conda.io/docs/user-guide/tasks/use-conda-with-travis-ci.html
+- if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then wget https://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh
+  -O miniconda.sh; else wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
+  -O miniconda.sh; fi
+- bash miniconda.sh -b -p $HOME/miniconda
+- export PATH="$HOME/miniconda/bin:$PATH"
+- hash -r
+- conda config --set always_yes yes --set changeps1 no
+- conda update -q conda
+- conda info -a
+
+# test-environment
+- conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION numpy pandas pytest
+  bcolz scipy
+- source activate test-environment
+- python --version
+- pip --version
+
+# install the repository, use tensorflow as backend by default
+- pip install tensorflow
+- pip install '.[develop]'
+
+script:
+# travis_wait 30 PYTHONPATH=$PWD:$PYTHONPATH py.test tests/
+- PYTHONPATH=$PWD:$PYTHONPATH py.test tests/
