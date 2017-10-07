@@ -1,6 +1,7 @@
 language: python
 sudo: required
 dist: trusty
+cache: pip
 
 services:
   - mongodb
@@ -38,7 +39,7 @@ install:
 # https://github.com/hyperopt/hyperopt/commit/2442bb24aca594bd566044fce276afbd377e0c03
 # solves this issue:
 # https://github.com/hyperopt/hyperopt/issues/325
-- git clone git@github.com:hyperopt/hyperopt.git
+- git clone https://github.com/hyperopt/hyperopt.git
 - pip install hyperopt/
 # install the repository, use tensorflow as backend by default
 - pip install tensorflow
