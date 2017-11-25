@@ -17,7 +17,7 @@ from keras.models import Sequential
 import keras.layers as kl
 from keras.optimizers import Adam
 # kopt and hyoperot imports
-from kopt import CompileFN, KMongoTrials, fn_test
+from kopt import CompileFN, KMongoTrials, test_fn
 from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
 
 
