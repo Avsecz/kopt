@@ -500,7 +500,7 @@ class CompileFN():
         add_arguments = set(kwargs.keys()).difference(possible_kwargs)
 
         if len(add_arguments) > 0:
-            raise ValueError("Unknown argument(s) {0}. **kwargs accepts only arguments: {0}.  ".
+            raise ValueError("Unknown argument(s) {0}. **kwargs accepts only arguments: {1}.  ".
                              format(add_arguments, possible_kwargs))
 
         self.optim_metric = optim_metric
