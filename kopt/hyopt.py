@@ -28,7 +28,7 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 
-def test_fn(fn, hyper_params, n_train=1000, save_model='best', tmp_dir="/tmp/kopt_test/"):
+def test_fn(fn, hyper_params, n_train=1000, save_model='best', tmp_dir="/tmp/kopt_test/", custom_objects=None):
     """Test the correctness of the compiled objective function (CompileFN). I will also test
     model saving/loading from disk.
 
@@ -40,7 +40,8 @@ def test_fn(fn, hyper_params, n_train=1000, save_model='best', tmp_dir="/tmp/kop
         save_model: If not None, the trained model is saved to a temporary directory
                     If save_model="best", save the best model using `keras.callbacks.ModelCheckpoint`, and
                     if save_model="last", save the model after training it.
-
+        custom_objects: argument passed to load_model - Optional dictionary mapping names (strings) to
+             custom classes or functions to be considered during deserialization.
     """
     def wrap_data_fn(data_fn, n_train=100):
         def new_data_fn(*args, **kwargs):
@@ -74,7 +75,7 @@ def test_fn(fn, hyper_params, n_train=1000, save_model='best', tmp_dir="/tmp/kop
         model_path = max(glob.iglob(fn.save_dir_exp + '/train_models/*.h5'),
                          key=os.path.getctime)
         assert datetime.fromtimestamp(os.path.getctime(model_path)) > start_time
-        load_model(model_path)
+        load_model(model_path, custom_objects=custom_objects)
 
 
 class KMongoTrials(MongoTrials):
@@ -259,7 +260,7 @@ class KMongoTrials(MongoTrials):
             plt.legend(loc='best')
         return fig
 
-    def load_model(self, tid):
+    def load_model(self, tid, custom_objects=None):
         """Load saved keras model of the trial.
 
         If tid = None, get the best model
@@ -271,7 +272,7 @@ class KMongoTrials(MongoTrials):
             tid = self.best_trial_tid()
 
         model_path = self.get_trial(tid)["result"]["path"]["model"]
-        return load_model(model_path)
+        return load_model(model_path, custom_objects=custom_objects)
 
     def n_ok(self):
         """Number of ok trials()
@@ -333,7 +334,7 @@ class KMongoTrials(MongoTrials):
 # TODO - put to a separate module
 def _train_and_eval_single(train, valid, model,
                            batch_size=32, epochs=300, use_weight=False,
-                           callbacks=[], eval_best=False, add_eval_metrics={}):
+                           callbacks=[], eval_best=False, add_eval_metrics={}, custom_objects=None):
     """Fit and evaluate a keras model
 
     eval_best: if True, load the checkpointed model for evaluation
@@ -365,7 +366,7 @@ def _train_and_eval_single(train, valid, model,
     if eval_best:
         mcp = [x for x in callbacks if isinstance(x, ModelCheckpoint)]
         assert len(mcp) == 1
-        model = load_model(mcp[0].filepath)
+        model = load_model(mcp[0].filepath, custom_objects=custom_objects)
 
     return eval_model(model, valid, add_eval_metrics), hist
 
@@ -461,7 +462,8 @@ class CompileFN():
                     if save_model="last", save the model after training it.
         save_results: If True, the return value is saved as .json to the `save_dir` directory.
         save_dir: Path to the save directory.
-
+        custom_objects: argument passed to load_model - Optional dictionary mapping names (strings) to
+             custom classes or functions to be considered during deserialization.
     """
     # TODO - check if we can get (db_name, exp_name) from hyperopt
 
@@ -482,6 +484,7 @@ class CompileFN():
                  save_model="best",
                  save_results=True,
                  save_dir=save_dir(),
+                 custom_objects=None,
                  **kwargs
                  ):
         self.data_fn = data_fn
@@ -525,6 +528,8 @@ class CompileFN():
         self.save_dir = save_dir
         self.save_model = save_model if save_model is not None else ""
         self.save_results = save_results
+        # loading
+        self.custom_objects = custom_objects
 
         # backcompatibility
         if self.save_model is True:
@@ -623,7 +628,8 @@ class CompileFN():
                                                            use_weight=param["fit"].get("use_weight", False),
                                                            callbacks=c_callbacks,
                                                            eval_best=self.save_model == "best",
-                                                           add_eval_metrics=self.add_eval_metrics)
+                                                           add_eval_metrics=self.add_eval_metrics,
+                                                           custom_objects=self.custom_objects)
             if self.save_model == "last":
                 model.save(model_path)
         else:
@@ -651,7 +657,8 @@ class CompileFN():
                                                               use_weight=param["fit"].get("use_weight", False),
                                                               callbacks=c_callbacks,
                                                               eval_best=self.save_model == "best",
-                                                              add_eval_metrics=self.add_eval_metrics)
+                                                              add_eval_metrics=self.add_eval_metrics,
+                                                              custom_objects=self.custom_objects)
                 print("\n")
                 eval_metrics_list.append(eval_m)
                 history.append(history_elem)
