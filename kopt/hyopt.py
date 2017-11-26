@@ -28,7 +28,7 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 
-def test_fn(fn, hyper_params, n_train=1000, tmp_dir="/tmp/kopt_test/"):
+def test_fn(fn, hyper_params, n_train=1000, save_model='best', tmp_dir="/tmp/kopt_test/"):
     """Test the correctness of the compiled objective function (CompileFN). I will also test
     model saving/loading from disk.
 
@@ -37,6 +37,9 @@ def test_fn(fn, hyper_params, n_train=1000, tmp_dir="/tmp/kopt_test/"):
         hyper_params: pyll graph of hyper-parameters - as later provided to `hyperopt.fmin`
         n_train: int, number of training points
         tmp_dir: Temporary path where to write the trained model.
+        save_model: If not None, the trained model is saved to a temporary directory
+                    If save_model="best", save the best model using `keras.callbacks.ModelCheckpoint`, and
+                    if save_model="last", save the model after training it.
 
     """
     def wrap_data_fn(data_fn, n_train=100):
@@ -44,13 +47,13 @@ def test_fn(fn, hyper_params, n_train=1000, tmp_dir="/tmp/kopt_test/"):
             data = data_fn(*args, **kwargs)
             train = data[0]
             train = subset(train, idx=np.arange(min(n_train, train[1].shape[0])))
-            return train, data[1]
+            return train,
         return new_data_fn
     start_time = datetime.now()
     fn = deepcopy(fn)
     hyper_params = deepcopy(hyper_params)
     fn.save_dir = tmp_dir
-    fn.save_model = "best"
+    fn.save_model = save_model
     fn.data_fn = wrap_data_fn(fn.data_fn, n_train)
 
     # sample from hyper_params
@@ -66,11 +69,12 @@ def test_fn(fn, hyper_params, n_train=1000, tmp_dir="/tmp/kopt_test/"):
     pprint.pprint(res)
     assert res["status"] == STATUS_OK
 
-    # correct model loading
-    model_path = max(glob.iglob(fn.save_dir_exp + '/train_models/*.h5'),
-                     key=os.path.getctime)
-    assert datetime.fromtimestamp(os.path.getctime(model_path)) > start_time
-    load_model(model_path)
+    if save_model:
+        # correct model loading
+        model_path = max(glob.iglob(fn.save_dir_exp + '/train_models/*.h5'),
+                         key=os.path.getctime)
+        assert datetime.fromtimestamp(os.path.getctime(model_path)) > start_time
+        load_model(model_path)
 
 
 class KMongoTrials(MongoTrials):
