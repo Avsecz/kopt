@@ -91,7 +91,6 @@ best = fmin(objective, hyper_params, trials=trials, algo=tpe.suggest, max_evals=
 trials = KMongoTrials(db_name, exp_name,
                       ip="localhost",
 	                  port=22334)
-trials = Trials()
 best = fmin(objective, hyper_params, trials=trials, algo=tpe.suggest, max_evals=2)
 ```
 
