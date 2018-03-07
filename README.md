@@ -5,6 +5,12 @@
 
 kopt is a hyper-parameter optimization library for Keras. It is based on [hyperopt](https://github.com/hyperopt/hyperopt).
 
+## Installation
+
+```bash
+pip install kopt
+```
+
 ## Getting started
 
 Here is an example of hyper-parameter optimization for the Keras IMDB
