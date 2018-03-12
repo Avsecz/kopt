@@ -27,12 +27,9 @@ logging.basicConfig(format='%(asctime)s [%(levelname)s] %(message)s')
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-# TODO - have a system-wide config for this
-DEFAULT_IP = "ouga03"
-DEFAULT_SAVE_DIR = "/s/project/deepcis/hyperopt/"
 
 
-def test_fn(fn, hyper_params, n_train=1000, save_model=None, tmp_dir="/tmp/hopt_test/", custom_objects=None):
+def test_fn(fn, hyper_params, n_train=1000, save_model=None, tmp_dir="/tmp/kopt_test/", custom_objects=None):
     """Test the correctness of the compiled objective function (CompileFN). I will also test
     model saving/loading from disk.
     # Arguments
@@ -81,7 +78,7 @@ def test_fn(fn, hyper_params, n_train=1000, save_model=None, tmp_dir="/tmp/hopt_
         load_model(model_path, custom_objects=custom_objects)
 
 
-class CMongoTrials(MongoTrials):
+class KMongoTrials(MongoTrials):
     """`hyperopt.MonoTrials` extended with the following methods:
     - get_trial(tid) - Retrieve trial by tid (Trial ID).
     - get_param(tid) - Retrieve used hyper-parameters for a trial.
@@ -107,13 +104,13 @@ class CMongoTrials(MongoTrials):
     """
 
     def __init__(self, db_name, exp_name,
-                 ip=DEFAULT_IP, port=1234, kill_timeout=None, **kwargs):
+                 ip=db_host(), port=db_port(), kill_timeout=None, **kwargs):
         self.kill_timeout = kill_timeout
         if self.kill_timeout is not None and self.kill_timeout < 60:
             logger.warning("kill_timeout < 60 -> Very short time for " +
                            "each job to complete before it gets killed!")
 
-        super(CMongoTrials, self).__init__(
+        super(KMongoTrials, self).__init__(
             'mongo://{ip}:{p}/{n}/jobs'.format(ip=ip, p=port, n=db_name), exp_key=exp_name, **kwargs)
 
     def get_trial(self, tid):
@@ -173,7 +170,7 @@ class CMongoTrials(MongoTrials):
         """
         if self.kill_timeout is not None:
             self.delete_running(self.kill_timeout)
-        return super(CMongoTrials, self).count_by_state_unsynced(arg)
+        return super(KMongoTrials, self).count_by_state_unsynced(arg)
 
     def delete_running(self, timeout_last_refresh=0, dry_run=False):
         """Delete jobs stalled in the running state for too long
@@ -256,7 +253,7 @@ class CMongoTrials(MongoTrials):
             plt.legend(loc='best')
         return fig
 
-    def load_model(self, tid):
+    def load_model(self, tid, custom_objects=None):
         """Load saved keras model of the trial.
         If tid = None, get the best model
         Not applicable for trials ran in cross validion (i.e. not applicable
@@ -266,7 +263,7 @@ class CMongoTrials(MongoTrials):
             tid = self.best_trial_tid()
 
         model_path = self.get_trial(tid)["result"]["path"]["model"]
-        return load_model(model_path)
+        return load_model(model_path, custom_objects=custom_objects)
 
     def n_ok(self):
         """Number of ok trials()
@@ -327,7 +324,7 @@ class CMongoTrials(MongoTrials):
 # --------------------------------------------
 def _train_and_eval_single(train, valid, test, model,
                            batch_size=32, epochs=300, use_weight=False,
-                           callbacks=[], eval_best=False, add_eval_metrics={}):
+                           callbacks=[], eval_best=False, add_eval_metrics={}, custom_objects=None):
     """Fit and evaluate a keras model
     eval_best: if True, load the checkpointed model for evaluation
     """
@@ -358,7 +355,7 @@ def _train_and_eval_single(train, valid, test, model,
     if eval_best:
         mcp = [x for x in callbacks if isinstance(x, ModelCheckpoint)]
         assert len(mcp) == 1
-        model = load_model(mcp[0].filepath)
+        model = load_model(mcp[0].filepath, custom_objects=custom_objects)
 
     return eval_model(model, valid, test, add_eval_metrics), hist
 
@@ -370,7 +367,7 @@ def eval_model(model, valid, test, add_eval_metrics={}):
         test: test-dataset. Tuple of inputs `x` and target `y` - `(x, y)`.
         add_eval_metrics: Additional evaluation metrics to use. Can be a dictionary or a list of functions
     accepting arguments: `y_true`, `y_predicted`. Alternatively, you can provide names of functions from
-    the `concise.eval_metrics` module.
+    the `kopt.eval_metrics` module.
     # Returns
         dictionary with evaluation metrics
     """
@@ -417,14 +414,14 @@ class CompileFN():
     - evaluates the model on the validation set
     - reports the performance metric on the validation set as the objective loss
     # Arguments
-        db_name: Database name of the CMongoTrials.
-        exp_name: Experiment name of the CMongoTrials.
+        db_name: Database name of the KMongoTrials.
+        exp_name: Experiment name of the KMongoTrials.
         data_fn: Tuple containing training data as the x,y pair at the first (index=0) element:
                  `((train_x, test_y), ...)`. If `valid_split` and `cv_n_folds` are both `None`,
                  the second (index=1) tuple is used as the validation dataset.
         add_eval_metrics: Additional list of (global) evaluation
             metrics. Individual elements can be
-            a string (referring to concise.eval_metrics)
+            a string (referring to kopt.eval_metrics)
             or a function taking two numpy arrays: `y_true`, `y_pred`.
             These metrics are ment to supplement those specified in
             `model.compile(.., metrics = .)`.
@@ -468,7 +465,8 @@ class CompileFN():
                  use_tensorboard=False,
                  save_model="best",
                  save_results=True,
-                 save_dir=DEFAULT_SAVE_DIR,
+                 save_dir=save_dir(),
+                 custom_objects=None,
                  **kwargs
                  ):
         self.data_fn = data_fn
@@ -491,7 +489,7 @@ class CompileFN():
         add_arguments = set(kwargs.keys()).difference(possible_kwargs)
 
         if len(add_arguments) > 0:
-            raise ValueError("Unknown argument(s) {0}. **kwargs accepts only arguments: {0}.  ".
+            raise ValueError("Unknown argument(s) {0}. **kwargs accepts only arguments: {1}.  ".
                              format(add_arguments, possible_kwargs))
 
         self.optim_metric = optim_metric
@@ -512,6 +510,8 @@ class CompileFN():
         self.save_dir = save_dir
         self.save_model = save_model if save_model is not None else ""
         self.save_results = save_results
+        # loading
+        self.custom_objects = custom_objects
 
         # backcompatibility
         if self.save_model is True:
@@ -557,7 +557,8 @@ class CompileFN():
         # setup paths for storing the data - TODO check if we can somehow get the id from hyperopt
         rid = str(uuid4())
         tm_dir = self.save_dir_exp + "/train_models/"
-        os.makedirs(tm_dir, exist_ok=True)
+        if not os.path.exists(tm_dir):
+            os.makedirs(tm_dir)
         model_path = tm_dir + "{0}.h5".format(rid) if self.save_model else ""
         results_path = tm_dir + "{0}.json".format(rid) if self.save_results else ""
 
@@ -613,7 +614,8 @@ class CompileFN():
                                                            use_weight=param["fit"].get("use_weight", False),
                                                            callbacks=c_callbacks,
                                                            eval_best=self.save_model == "best",
-                                                           add_eval_metrics=self.add_eval_metrics)
+                                                           add_eval_metrics=self.add_eval_metrics,
+                                                           custom_objects=self.custom_objects)
             if self.save_model == "last":
                 model.save(model_path)
         else:
@@ -642,7 +644,8 @@ class CompileFN():
                                                               use_weight=param["fit"].get("use_weight", False),
                                                               callbacks=c_callbacks,
                                                               eval_best=self.save_model == "best",
-                                                              add_eval_metrics=self.add_eval_metrics)
+                                                              add_eval_metrics=self.add_eval_metrics,
+                                                              custom_objects=self.custom_objects)
                 print("\n")
                 eval_metrics_list.append(eval_m)
                 history.append(history_elem)
