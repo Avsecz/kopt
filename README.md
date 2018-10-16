@@ -1,7 +1,7 @@
 # kopt - Hyper-parameter optimization for Keras
 
-[![Build Status](https://travis-ci.org/Avsecz/keras-hyperopt.svg?branch=master)](https://travis-ci.org/avsecz/keras-hyperopt)
-[![license](https://img.shields.io/github/license/mashape/apistatus.svg?maxAge=2592000)](https://github.com/avsecz/keras-hyperopt/blob/master/LICENSE)
+[![Build Status](https://travis-ci.org/Avsecz/kopt.svg?branch=master)](https://travis-ci.org/avsecz/kopt)
+[![license](https://img.shields.io/github/license/mashape/apistatus.svg?maxAge=2592000)](https://github.com/avsecz/kopt/blob/master/LICENSE)
 
 kopt is a hyper-parameter optimization library for Keras. It is based on [hyperopt](https://github.com/hyperopt/hyperopt).
 
