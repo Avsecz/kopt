@@ -11,6 +11,12 @@ kopt is a hyper-parameter optimization library for Keras. It is based on [hypero
 pip install kopt
 ```
 
+Alternatively, Scprep can be installed using [Conda](https://conda.io/docs/) (most easily obtained via the [Miniconda Python distribution](https://conda.io/miniconda.html)):
+
+```bash
+conda install -c bioconda kopt
+```
+
 ## Getting started
 
 Here is an example of hyper-parameter optimization for the Keras IMDB
