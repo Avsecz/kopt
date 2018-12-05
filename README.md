@@ -1,7 +1,7 @@
 # kopt - Hyper-parameter optimization for Keras
 
 [![Build Status](https://travis-ci.org/Avsecz/kopt.svg?branch=master)](https://travis-ci.org/avsecz/kopt)
-[![license](https://img.shields.io/github/license/mashape/apistatus.svg?maxAge=2592000)](https://github.com/avsecz/keras-hyperopt/blob/master/LICENSE)
+[![license](https://img.shields.io/github/license/mashape/apistatus.svg?maxAge=2592000)](https://github.com/avsecz/kopt/blob/master/LICENSE)
 
 kopt is a hyper-parameter optimization library for Keras. It is based on [hyperopt](https://github.com/hyperopt/hyperopt).
 
@@ -15,12 +15,17 @@ pip install git+https://github.com/hyperopt/hyperopt.git
 pip install kopt
 ```
 
+Alternatively, kopt can be installed using [Conda](https://conda.io/docs/) (most easily obtained via the [Miniconda Python distribution](https://conda.io/miniconda.html)):
+
+```bash
+conda install -c bioconda kopt
+```
+
 ### Installation issues
 
 - Reported by [gokceneraslan](https://github.com/gokceneraslan/) - 2018-03-11
   - > hyperopt on pypi doesn't work with latest networkx 2, there are [several issues](https://github.com/hyperopt/hyperopt/issues/333). Maybe it would have been better to wait for the [upcoming hyperopt release](https://github.com/hyperopt/hyperopt/milestone/3) and then pin required hyperopt to new version.
     - possible solution to networkx 2 issue: `pip install networkx==1.11` before installing hyperopt
-
 
 ## Getting started
 
