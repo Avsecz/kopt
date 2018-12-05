@@ -362,15 +362,17 @@ def _train_and_eval_single(train, valid, model,
                   sample_weight=sample_weight,
                   verbose=2,
                   callbacks=[history] + callbacks)
+    # if we're using h5 files
     elif data_format == 'hdf5':
         model.fit(train[0], train[1],
-          batch_size=batch_size,
-          validation_data=valid[:2],
-          epochs=epochs,
-          sample_weight=sample_weight,
-          verbose=2,
-          callbacks=[history] + callbacks,
-          shuffle='batch')
+                  batch_size=batch_size,
+                  validation_data=valid[:2],
+                  epochs=epochs,
+                  sample_weight=sample_weight,
+                  verbose=2,
+                  callbacks=[history] + callbacks,
+                  shuffle='batch')
+    # else, just exit cleanly
     else:
         logger.error('Data format is not supported. You can use numpy arrays (default), or hdf5 arrays.')
         exit(-1)
