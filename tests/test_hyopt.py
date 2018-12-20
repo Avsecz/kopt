@@ -6,7 +6,7 @@ from kopt.hyopt import CompileFN, KMongoTrials
 from kopt.hyopt import test_fn as fn_test
 from kopt.utils import merge_dicts
 import subprocess
-from tests import data, model
+from tests import data, data_h5py, model
 from copy import deepcopy
 import pytest
 
@@ -38,6 +38,37 @@ def test_argument_compileCN():
                       loss_metric_mode="max",
                       unknown_arg=3)
 
+
+def test_compilefn_train_test_split_h5py(tmpdir):
+    '''
+    Test out a kopt optimization when loading data from h5py.
+    '''
+    db_name = "test"
+    exp_name = "test2"
+    fn = CompileFN(db_name, exp_name,
+                   data_fn=data.data_hdf5,
+                   model_fn=model.build_model_hdf5,
+                   optim_metric="acc",
+                   optim_metric_mode="max",
+                   # eval
+                   valid_split=.1,
+                   stratified=False,
+                   random_state=True,
+                   save_dir="/tmp/",
+                   data_format='hdf5')
+    hyper_params = {
+        "data": {},
+        "model": {"n_filters": hp.choice("m_n_filters", (2, 5)),
+                  "n_convolutions": hp.choice("m_n_convolutions", (1, 3)),
+                  "kernel_size": hp.choice("m_kernel_size", (2, 5)),
+                  "hidden_dims": 3,
+                  },
+        "fit": {"epochs": 1}
+    }
+    fn_test(fn, hyper_params, tmp_dir=str(tmpdir))
+    trials = Trials()
+    best = fmin(fn, hyper_params, trials=trials, algo=tpe.suggest, max_evals=2)
+    assert isinstance(best, dict)
 
 def test_compilefn_train_test_split(tmpdir):
     db_name = "test"
