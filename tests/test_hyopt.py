@@ -6,7 +6,7 @@ from kopt.hyopt import CompileFN, KMongoTrials
 from kopt.hyopt import test_fn as fn_test
 from kopt.utils import merge_dicts
 import subprocess
-from tests import data, data_h5py, model
+from tests import data, model
 from copy import deepcopy
 import pytest
 
