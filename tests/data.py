@@ -32,5 +32,5 @@ def data_hdf5():
     '''
     print('Loading data...')
     # open and allow other to open and read in other processes
-    f = h5py.File('data/data.h5', 'r', libver='latest', swmr=True)
+    f = h5py.File('tests/data/data.h5', 'r', libver='latest', swmr=True)
     return (f['x_train'], f['y_train']), (f['x_test'], f['y_test'])
