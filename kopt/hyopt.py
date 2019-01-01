@@ -334,7 +334,7 @@ class KMongoTrials(MongoTrials):
 # TODO - put to a separate module
 def _train_and_eval_single(train, valid, model,
                            batch_size=32, epochs=300, use_weight=False,
-                           callbacks=[], eval_best=False, add_eval_metrics={}, custom_objects=None):
+                           callbacks=[], eval_best=False, add_eval_metrics={}, custom_objects=None,data_format='npy'):
     """Fit and evaluate a keras model
 
     eval_best: if True, load the checkpointed model for evaluation
@@ -352,14 +352,30 @@ def _train_and_eval_single(train, valid, model,
     # train the model
     logger.info("Fit...")
     history = History()
-    model.fit(train[0], train[1],
-              batch_size=batch_size,
-              validation_data=valid[:2],
-              epochs=epochs,
-              sample_weight=sample_weight,
-              verbose=2,
-              callbacks=[history] + callbacks)
 
+    # if we're using numpy arrays
+    if data_format == 'npy':
+        model.fit(train[0], train[1],
+                  batch_size=batch_size,
+                  validation_data=valid[:2],
+                  epochs=epochs,
+                  sample_weight=sample_weight,
+                  verbose=2,
+                  callbacks=[history] + callbacks)
+    # if we're using h5 files
+    elif data_format == 'hdf5':
+        model.fit(train[0], train[1],
+                  batch_size=batch_size,
+                  validation_data=valid[:2],
+                  epochs=epochs,
+                  sample_weight=sample_weight,
+                  verbose=2,
+                  callbacks=[history] + callbacks,
+                  shuffle='batch')
+    # else, just exit cleanly
+    else:
+        logger.error('Data format is not supported. You can use numpy arrays (default), or hdf5 arrays.')
+        exit(-1)
     # get history
     hist = _format_keras_history(history)
     # load and eval the best model
@@ -503,8 +519,16 @@ class CompileFN():
             optim_metric = kwargs["loss_metric"]
         if "loss_metric_mode" in kwargs and optim_metric_mode == "min":
             optim_metric_mode = kwargs["loss_metric_mode"]
-        possible_kwargs = ["loss_metric", "loss_metric_mode"]
+
+        # add in additional kwarg to handle reading directly from h5py
+        if 'data_format' in kwargs:
+            self.data_format = kwargs['data_format']
+        else:
+            self.data_format = 'npy'
+        possible_kwargs = ["loss_metric", "loss_metric_mode", 'data_format']
         add_arguments = set(kwargs.keys()).difference(possible_kwargs)
+
+        # add in ability to handle reading from hdf5
 
         if len(add_arguments) > 0:
             raise ValueError("Unknown argument(s) {0}. **kwargs accepts only arguments: {1}.  ".
@@ -629,7 +653,8 @@ class CompileFN():
                                                            callbacks=c_callbacks,
                                                            eval_best=self.save_model == "best",
                                                            add_eval_metrics=self.add_eval_metrics,
-                                                           custom_objects=self.custom_objects)
+                                                           custom_objects=self.custom_objects,
+                                                           data_format=self.data_format)
             if self.save_model == "last":
                 model.save(model_path)
         else:
