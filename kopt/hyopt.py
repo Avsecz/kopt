@@ -10,7 +10,6 @@ from hyperopt.mongoexp import MongoTrials
 import kopt.eval_metrics as ce
 from kopt.utils import write_json, merge_dicts, _to_string
 from kopt.model_data import (subset, split_train_test_idx, split_KFold_idx)
-from kopt.config import db_host, db_port, save_dir
 from datetime import datetime, timedelta
 from uuid import uuid4
 from hyperopt import STATUS_OK
@@ -21,6 +20,7 @@ import os
 import glob
 import pprint
 import logging
+import matplotlib.pyplot as plt
 
 
 logging.basicConfig(format='%(asctime)s [%(levelname)s] %(message)s')
@@ -28,10 +28,10 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 
-def test_fn(fn, hyper_params, n_train=1000, save_model='best', tmp_dir="/tmp/kopt_test/", custom_objects=None):
+
+def test_fn(fn, hyper_params, n_train=1000, save_model=None, tmp_dir="/tmp/kopt_test/", custom_objects=None):
     """Test the correctness of the compiled objective function (CompileFN). I will also test
     model saving/loading from disk.
-
     # Arguments
         fn: CompileFN instance
         hyper_params: pyll graph of hyper-parameters - as later provided to `hyperopt.fmin`
@@ -48,7 +48,7 @@ def test_fn(fn, hyper_params, n_train=1000, save_model='best', tmp_dir="/tmp/kop
             data = data_fn(*args, **kwargs)
             train = data[0]
             train = subset(train, idx=np.arange(min(n_train, train[1].shape[0])))
-            return train,
+            return train, data[1], data[2]
         return new_data_fn
     start_time = datetime.now()
     fn = deepcopy(fn)
@@ -80,7 +80,6 @@ def test_fn(fn, hyper_params, n_train=1000, save_model='best', tmp_dir="/tmp/kop
 
 class KMongoTrials(MongoTrials):
     """`hyperopt.MonoTrials` extended with the following methods:
-
     - get_trial(tid) - Retrieve trial by tid (Trial ID).
     - get_param(tid) - Retrieve used hyper-parameters for a trial.
     - best_trial_tid(rank=0) - Return the trial with lowest loss.
@@ -95,7 +94,6 @@ class KMongoTrials(MongoTrials):
     - get_ok_results - Return a list of trial results with an "ok" status
     - load_model(tid) - Load a Keras model of a tid.
     - as_df - Returns a tidy `pandas.DataFrame` of the trials database.
-
     # Arguments
         db_name: str, MongoTrials database name
         exp_name: strm, MongoTrials experiment name
@@ -103,7 +101,6 @@ class KMongoTrials(MongoTrials):
         port: int, MongoDB port.
         kill_timeout: int, Maximum runtime of a job (in seconds) before it gets killed. None for infinite.
         **kwargs: Additional keyword arguments passed to the `hyperopt.MongoTrials` constructor.
-
     """
 
     def __init__(self, db_name, exp_name,
@@ -128,7 +125,6 @@ class KMongoTrials(MongoTrials):
 
     def best_trial_tid(self, rank=0):
         """Get tid of the best trial
-
         rank=0 means the best model
         rank=1 means second best
         ...
@@ -178,7 +174,6 @@ class KMongoTrials(MongoTrials):
 
     def delete_running(self, timeout_last_refresh=0, dry_run=False):
         """Delete jobs stalled in the running state for too long
-
         timeout_last_refresh, int: number of seconds
         """
         running_all = self.handle.jobs_running()
@@ -246,8 +241,6 @@ class KMongoTrials(MongoTrials):
                      figsize=(15, 3)):
         """Plot the loss curves"""
         history = self.train_history(tid)
-        import matplotlib.pyplot as plt
-
         fig = plt.figure(figsize=figsize)
         for i, score in enumerate(scores):
             plt.subplot(1, len(scores), i + 1)
@@ -262,9 +255,7 @@ class KMongoTrials(MongoTrials):
 
     def load_model(self, tid, custom_objects=None):
         """Load saved keras model of the trial.
-
         If tid = None, get the best model
-
         Not applicable for trials ran in cross validion (i.e. not applicable
         for `CompileFN.cv_n_folds is None`
         """
@@ -331,12 +322,10 @@ class KMongoTrials(MongoTrials):
 
 
 # --------------------------------------------
-# TODO - put to a separate module
-def _train_and_eval_single(train, valid, model,
+def _train_and_eval_single(train, valid, test, model,
                            batch_size=32, epochs=300, use_weight=False,
                            callbacks=[], eval_best=False, add_eval_metrics={}, custom_objects=None):
     """Fit and evaluate a keras model
-
     eval_best: if True, load the checkpointed model for evaluation
     """
     def _format_keras_history(history):
@@ -358,7 +347,7 @@ def _train_and_eval_single(train, valid, model,
               epochs=epochs,
               sample_weight=sample_weight,
               verbose=2,
-              callbacks=[history] + callbacks)
+              callbacks=[history])# + callbacks) <------------------------------ #TODO: make early stopping optional
 
     # get history
     hist = _format_keras_history(history)
@@ -368,28 +357,25 @@ def _train_and_eval_single(train, valid, model,
         assert len(mcp) == 1
         model = load_model(mcp[0].filepath, custom_objects=custom_objects)
 
-    return eval_model(model, valid, add_eval_metrics), hist
+    return eval_model(model, valid, test, add_eval_metrics), hist
 
 
-def eval_model(model, test, add_eval_metrics={}):
+def eval_model(model, valid, test, add_eval_metrics={}):
     """Evaluate model's performance on the test-set.
-
     # Arguments
         model: Keras model
         test: test-dataset. Tuple of inputs `x` and target `y` - `(x, y)`.
         add_eval_metrics: Additional evaluation metrics to use. Can be a dictionary or a list of functions
     accepting arguments: `y_true`, `y_predicted`. Alternatively, you can provide names of functions from
     the `kopt.eval_metrics` module.
-
     # Returns
         dictionary with evaluation metrics
-
     """
     # evaluate the model
     logger.info("Evaluate...")
     # - model_metrics
-    model_metrics_values = model.evaluate(test[0], test[1], verbose=0,
-                                          batch_size=test[1].shape[0])
+    model_metrics_values = model.evaluate(valid[0], valid[1], verbose=0,
+                                          batch_size=valid[1].shape[0])
     # evaluation is done in a single pass to have more precise metics
     model_metrics = dict(zip(_listify(model.metrics_names),
                              _listify(model_metrics_values)))
@@ -424,11 +410,9 @@ def get_data(data_fn, param):
 
 class CompileFN():
     """Compile an objective function that
-
     - trains the model on the training set
     - evaluates the model on the validation set
     - reports the performance metric on the validation set as the objective loss
-
     # Arguments
         db_name: Database name of the KMongoTrials.
         exp_name: Experiment name of the KMongoTrials.
@@ -462,8 +446,6 @@ class CompileFN():
                     if save_model="last", save the model after training it.
         save_results: If True, the return value is saved as .json to the `save_dir` directory.
         save_dir: Path to the save directory.
-        custom_objects: argument passed to load_model - Optional dictionary mapping names (strings) to
-             custom classes or functions to be considered during deserialization.
     """
     # TODO - check if we can get (db_name, exp_name) from hyperopt
 
@@ -596,6 +578,9 @@ class CompileFN():
         train = data[0]
         if self.cv_n_folds is None and self.valid_split is None:
             valid_data = data[1]
+            test = data[2]
+        else:
+            test = data[1]
         del data
         time_data_loaded = datetime.now()
 
@@ -622,6 +607,7 @@ class CompileFN():
                                                 save_best_only=True)]
             eval_metrics, history = _train_and_eval_single(train=train_data,
                                                            valid=valid_data,
+                                                           test=test,
                                                            model=model,
                                                            epochs=param["fit"]["epochs"],
                                                            batch_size=param["fit"]["batch_size"],
@@ -651,6 +637,7 @@ class CompileFN():
                                                     save_best_only=True)]
                 eval_m, history_elem = _train_and_eval_single(train=subset(train, train_idx),
                                                               valid=subset(train, valid_idx),
+                                                              test=test,
                                                               model=model,
                                                               epochs=param["fit"]["epochs"],
                                                               batch_size=param["fit"]["batch_size"],
@@ -784,3 +771,4 @@ def _dict_to_filestring(d):
             return str(v)
 
     return ";".join([k + "=" + to_str(v) for k, v in d.items()])
+
