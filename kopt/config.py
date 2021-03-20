@@ -57,7 +57,7 @@ def set_save_dir(_save_dir):
 _config_path = os.path.expanduser(os.path.join(_kopt_dir, 'config.yaml'))
 if os.path.exists(_config_path):
     try:
-        _config = yaml.load(open(_config_path))
+        _config = yaml.load(open(_config_path), Loader=yaml.FullLoader)
     except ValueError:
         _config = {}
     _db_host = _config.get('db_host', db_host())
